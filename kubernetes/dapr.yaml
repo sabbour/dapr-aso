@@ -1,0 +1,17 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: myapp
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: myapp-redis.redis.cache.windows.net:6380
+  - name: redisPassword
+    secretKeyRef:
+      name: redis-secret
+      key:  primaryKey
+  - name: enableTLS
+    value: true

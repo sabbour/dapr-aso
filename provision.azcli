@@ -1,0 +1,43 @@
+# Variables
+CLUSTER_NAME=dapr-aso-aks
+CLUSTER_RG=dapr-aso-rg
+LOCATION=eastus
+AZURE_TENANT_ID=$(az account show --query tenantId -o tsv)
+AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+ASO_SP_NAME=azure-service-operator-asabbour
+AZURE_CLIENT_SECRET=$(az ad sp create-for-rbac -n ${ASO_SP_NAME}  --role contributor --scopes /subscriptions/$AZURE_SUBSCRIPTION_ID --query password -o tsv)
+AZURE_CLIENT_ID=$(az ad sp list --display-name ${ASO_SP_NAME} --query "[].{id:appId}" -o tsv)
+
+# Resource group and AKS cluster
+az group create -n ${CLUSTER_RG} -l ${LOCATION}
+az aks create --resource-group ${CLUSTER_RG} --name ${CLUSTER_NAME} --node-count 3 --generate-ssh-keys
+az aks get-credentials --resource-group ${CLUSTER_RG} --name ${CLUSTER_NAME}
+
+# Dapr
+az k8s-extension create --cluster-type managedClusters \
+--cluster-name ${CLUSTER_NAME} \
+--resource-group ${CLUSTER_RG} \
+--name daprExtension \
+--extension-type Microsoft.Dapr \
+--auto-upgrade-minor-version true \
+--configuration-settings "global.ha.enabled=true" \
+--configuration-settings "dapr_operator.replicaCount=2"
+
+# Azure Service Operator
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.8.2/cert-manager.yaml
+helm repo add aso2 https://raw.githubusercontent.com/Azure/azure-service-operator/main/v2/charts
+helm upgrade --install --devel aso2 aso2/azure-service-operator \
+     --create-namespace \
+     --namespace=azureserviceoperator-system \
+     --set azureSubscriptionID=$AZURE_SUBSCRIPTION_ID \
+     --set azureTenantID=$AZURE_TENANT_ID \
+     --set azureClientID=$AZURE_CLIENT_ID \
+     --set azureClientSecret=$AZURE_CLIENT_SECRET
+
+# Deploy resources
+kubectl create ns myapp
+kubectl apply -f kubetneres/redis.yaml
+kubectl apply -f kubetneres/dapr.yaml
+kubectl apply -f kubetneres/app.yaml
+
+https://sookocheff.com/post/dapr/running-a-dapr-application-on-kubernetes/

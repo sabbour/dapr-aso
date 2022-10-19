@@ -1,0 +1,40 @@
+apiVersion: resources.azure.com/v1alpha1api20200601
+kind: ResourceGroup
+metadata:
+  name: myapp-rg
+  namespace: myapp
+spec:
+  location: eastus
+---
+apiVersion: cache.azure.com/v1beta20201201
+kind: Redis
+metadata:
+  name: myapp-redis
+  namespace: myapp
+spec:
+  location: eastus
+  owner:
+    name: myapp-rg
+  sku:
+    family: C
+    name: Basic
+    capacity: 1
+  enableNonSslPort: false
+  redisConfiguration:
+    maxmemory-delta: "10"
+    maxmemory-policy: allkeys-lru
+  # Optional: Save the connection details for this Redis into a Kubernetes secret
+  operatorSpec:
+    secrets:
+      primaryKey:
+        name: redis-secret
+        key: primaryKey
+      secondaryKey:
+        name: redis-secret
+        key: secondaryKey
+      hostName:
+        name: redis-secret
+        key: hostName
+      sslPort:
+        name: redis-secret
+        key: port
